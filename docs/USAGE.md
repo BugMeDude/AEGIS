@@ -156,3 +156,17 @@ Written to `report_dir` (default `aegis_reports/`):
 - The “I am authorised…” checkbox maps to the safety gate
 
 The engine runs in a worker thread; the UI never blocks.
+
+**Window & input**
+
+- **Fullscreen:** `F11` to toggle, `Esc` to exit, or the **Fullscreen** button
+  (top-right). The window is also freely resizable; the layout stays centred.
+- **Input box:** right-click for **Cut / Copy / Paste / Select all / Clear**;
+  `Ctrl+A` select-all, `Ctrl+C/V/X` clipboard, `Ctrl+Z` undo. Quick **✕ Clear**
+  and **Paste** buttons sit beside it.
+- **Load a file:** **Open file…** accepts `.json` (Postman/OpenAPI/HAR),
+  `.yaml/.yml`, `.har`, `.txt/.curl/.sh` (cURL or URL list) or *any* file; the
+  input **Type** is auto-selected from the extension.
+- **Targets:** paste a cURL, a full URL, or a **bare host / IP**
+  (`127.0.0.1:8000`, `api.example.com/v1`) — `http://` is assumed when no
+  scheme is given. `Ctrl+Q` quits.

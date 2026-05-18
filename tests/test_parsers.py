@@ -87,6 +87,19 @@ def test_auto_detect():
     assert len(parse_any("https://x.com/a\nhttps://x.com/b")) == 2
 
 
+def test_bare_host_ip_url():
+    assert parse_any("127.0.0.1:8000")[0].url == "http://127.0.0.1:8000"
+    assert parse_any("api.example.com/v1/users")[0].url == \
+        "http://api.example.com/v1/users"
+    assert parse_any("localhost:8080")[0].url == "http://localhost:8080"
+    s = parse_any("10.0.0.5\nexample.org/health")
+    assert len(s) == 2 and s[0].url == "http://10.0.0.5"
+    # explicit scheme preserved
+    assert parse_any("https://x.com/a")[0].url == "https://x.com/a"
+    # not a host -> treated as curl attempt, yields nothing
+    assert parse_any("just some words", input_type="auto") == []
+
+
 def test_global_overrides():
     specs = parse_any("curl https://old.com/path",
                       base_url="https://new.com", token="abc")

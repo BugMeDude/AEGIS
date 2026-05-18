@@ -237,6 +237,27 @@ def _apply_vars(spec: RequestSpec, variables: dict[str, str]) -> None:
         spec.url = spec.url.replace(f"{{{{{k}}}}}", v)
 
 
+# A bare host / IP / host:port[/path] with no scheme (e.g. "127.0.0.1:8000",
+# "api.example.com/v1", "10.0.0.5").
+_BARE_HOST = re.compile(
+    r"^(?:(?:\d{1,3}\.){3}\d{1,3}|localhost|[\w-]+(?:\.[\w-]+)+)"
+    r"(?::\d+)?(?:/\S*)?$",
+    re.IGNORECASE,
+)
+
+
+def _as_url(line: str) -> str | None:
+    """Return a fully-qualified URL for a line that is a URL/host/IP, else None."""
+    line = line.strip()
+    if not line:
+        return None
+    if re.match(r"^https?://", line, re.IGNORECASE):
+        return line
+    if _BARE_HOST.match(line):
+        return "http://" + line
+    return None
+
+
 def parse_any(
     text: str,
     *,
@@ -245,7 +266,11 @@ def parse_any(
     token: str = "",
     variables: dict[str, str] | None = None,
 ) -> list[RequestSpec]:
-    """Parse arbitrary input. ``input_type`` ∈ auto|curl|postman|openapi|har|url."""
+    """Parse arbitrary input. ``input_type`` ∈ auto|curl|postman|openapi|har|url.
+
+    The ``url`` path also accepts bare hosts/IPs (``127.0.0.1:8000``,
+    ``api.example.com/v1``) — ``http://`` is assumed when no scheme is given.
+    """
     text = (text or "").strip()
     variables = variables or {}
     specs: list[RequestSpec] = []
@@ -266,7 +291,7 @@ def parse_any(
                     input_type = "postman"
             except json.JSONDecodeError:
                 input_type = "url"
-        elif re.match(r"^https?://", text):
+        elif all(_as_url(ln) for ln in text.splitlines() if ln.strip()):
             input_type = "url"
         else:
             input_type = "curl"
@@ -275,9 +300,9 @@ def parse_any(
         specs = parse_curl_multi(text, variables)
     elif input_type == "url":
         for line in text.splitlines():
-            line = line.strip()
-            if re.match(r"^https?://", line):
-                specs.append(RequestSpec(url=line).normalised())
+            u = _as_url(line)
+            if u:
+                specs.append(RequestSpec(url=u).normalised())
     else:
         doc = json.loads(text)
         if input_type == "postman":
