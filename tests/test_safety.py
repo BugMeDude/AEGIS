@@ -51,6 +51,32 @@ def test_plan_clamped_to_caps():
 def test_empty_requests_refused():
     with pytest.raises(SafetyError):
         enforce([], TestPlan(), SafetyPolicy())
+    with pytest.raises(SafetyError):
+        enforce([], TestPlan(), SafetyPolicy(lab_mode=True))
+
+
+def test_private_rfc1918_is_local_without_auth():
+    pol = SafetyPolicy(authorized=False)
+    for h in ("http://192.168.1.10/a", "http://10.0.0.5:8080/x",
+              "http://172.16.4.4/y"):
+        enforce([_spec(h)], TestPlan(), pol)  # no raise
+
+
+def test_lab_mode_bypasses_everything():
+    pol = SafetyPolicy(lab_mode=True, authorized=False)
+    plan = TestPlan(concurrency=99999, duration_seconds=999999)
+    notes = enforce([_spec("https://anything.example.com/x")], plan, pol)
+    assert notes == []                       # no auth refusal
+    assert plan.concurrency == 99999         # caps NOT clamped
+    assert plan.duration_seconds == 999999
+
+
+def test_lab_mode_env(monkeypatch):
+    from aegis.config import AegisConfig
+    monkeypatch.setenv("AEGIS_LAB_MODE", "1")
+    cfg = AegisConfig()          # no file I/O
+    cfg._apply_env()
+    assert cfg.safety.lab_mode and cfg.safety.authorized
 
 
 def test_classify_targets():

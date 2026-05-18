@@ -17,7 +17,7 @@ from __future__ import annotations
 
 __app_name__ = "AEGIS"
 __tagline__ = "Autonomous API Stress & Security Intelligence Platform"
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "BugMeDude"
 
 # Single source of truth for the education/research caption. Surfaced in the

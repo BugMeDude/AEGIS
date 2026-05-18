@@ -249,7 +249,7 @@ class RunReport:
     def to_dict(self) -> dict[str, Any]:
         return {
             "app": "AEGIS",
-            "version": "2.0.0",
+            "version": "2.1.0",
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "wall_seconds": round(self.wall_seconds, 3),

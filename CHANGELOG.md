@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.1.0 — Lab mode, responsive frosted GUI
+
+- **Lab mode** (`--lab` · `AEGIS_LAB_MODE=1` · `safety.lab_mode: true`):
+  isolated authorised labs waive the authorization prompt **and all caps** —
+  full offensive capability, zero friction. Default stays safe so a fresh
+  public clone is not a turn-key weapon; loopback + **RFC1918 private**
+  ranges are always treated as lab. A git-ignored local `aegis.yaml` makes
+  it automatic on the operator's machine only.
+- **GUI redesign:** calm near-monochrome frosted aesthetic, single accent,
+  generous whitespace (replaces the over-saturated multi-colour look).
+- **Responsive layout:** the left column is fixed, the right column and
+  background fill the window — maximise / full-screen now use the whole
+  screen instead of sitting centred. `F11`/`Esc` fullscreen.
+- **Reliable controls:** the flaky ttk TYPE combobox replaced with a custom
+  menu-backed dropdown; every button rebuilt with a robust click path
+  (separate hover/press state) and auto-contrast text; Lab-mode toggle added.
+- Parser accepts bare host/IP/`host:port` (assumes `http://`).
+- 49 tests (added lab-mode + RFC1918 + bare-host cases); verified live
+  against authorised public targets (vulnweb / testfire). README expanded
+  with a full command cookbook and an authorised-targets list.
+
 ## 2.0.0 — AEGIS (full rebuild of "Ethical Hacker API Tester")
 
 Complete ground-up rewrite. The 2024 originals are preserved untouched

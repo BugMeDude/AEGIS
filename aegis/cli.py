@@ -67,11 +67,15 @@ def _read_input(value: str) -> str:
     return value
 
 
-def _load_cfg(config: str | None, no_ai: bool, authorized: bool) -> AegisConfig:
+def _load_cfg(config: str | None, no_ai: bool, authorized: bool,
+              lab: bool = False) -> AegisConfig:
     cfg = AegisConfig.load(config)
     if no_ai:
         cfg.ollama.enabled = False
     if authorized:
+        cfg.safety.authorized = True
+    if lab:
+        cfg.safety.lab_mode = True
         cfg.safety.authorized = True
     return cfg
 
@@ -232,11 +236,16 @@ def doctor(
         t.add_row("Ollama", f"[yellow]unavailable[/] ({health.get('reason','')})")
         t.add_row("AI mode", "[yellow]heuristic fallback (still fully functional)[/]")
     pol = cfg.safety
-    t.add_row("Authorized", "[green]yes[/]" if pol.authorized else
-              "[yellow]no (non-local targets require --authorized)[/]")
-    t.add_row("Caps", f"conc≤{pol.max_concurrency} · "
-              f"dur≤{pol.max_duration_seconds}s · "
-              f"reqs≤{pol.max_total_requests}")
+    if pol.lab_mode:
+        t.add_row("Mode", "[bold magenta]LAB — full capability, no caps, "
+                  "no auth prompt[/]")
+        t.add_row("Caps", "[magenta]disabled (lab mode)[/]")
+    else:
+        t.add_row("Authorized", "[green]yes[/]" if pol.authorized else
+                  "[yellow]no (non-local targets require --authorized/--lab)[/]")
+        t.add_row("Caps", f"conc≤{pol.max_concurrency} · "
+                  f"dur≤{pol.max_duration_seconds}s · "
+                  f"reqs≤{pol.max_total_requests}")
     t.add_row("Edition", "Offensive + Defensive · Education & Research")
     con.print(t)
     con.print(Panel(EDU_NOTICE, title="⚠ Responsible-use & education notice",
@@ -295,12 +304,15 @@ def run(
     formats: str = typer.Option("json,html,md", "--formats"),
     authorized: bool = typer.Option(False, "--authorized",
                                     help="Affirm you are authorised to test."),
+    lab: bool = typer.Option(False, "--lab",
+                             help="Authorised-lab mode: no auth prompt, no "
+                                  "caps, full capability."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Force heuristic engine."),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Run a load + security test with a plan you control."""
     _banner()
-    cfg = _load_cfg(config, no_ai, authorized)
+    cfg = _load_cfg(config, no_ai, authorized, lab)
     orch = Orchestrator(cfg)
     from .models import TestPlan
     user_plan = None if ai_plan else TestPlan(
@@ -326,13 +338,16 @@ def autopilot(
     save: bool = typer.Option(True, "--save/--no-save"),
     formats: str = typer.Option("json,html,md", "--formats"),
     authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab",
+                             help="Authorised-lab mode: no auth prompt, no "
+                                  "caps, full capability."),
     no_ai: bool = typer.Option(False, "--no-ai"),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Fully automated: the AI plans, runs, analyses and reports."""
     _banner()
     con.print("[cyan]🤖 Autopilot engaged — AI will design and run the test.[/]")
-    cfg = _load_cfg(config, no_ai, authorized)
+    cfg = _load_cfg(config, no_ai, authorized, lab)
     orch = Orchestrator(cfg)
     code = _execute(orch, raw=_read_input(input), input_type=input_type,
                     plan=None, goal=goal, ai_plan=True,
@@ -346,12 +361,15 @@ def ai(
     save: bool = typer.Option(True, "--save/--no-save"),
     formats: str = typer.Option("json,html,md", "--formats"),
     authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab",
+                             help="Authorised-lab mode: no auth prompt, no "
+                                  "caps, full capability."),
     no_ai: bool = typer.Option(False, "--no-ai"),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Natural language: aegis ai "stress https://x for 30s, 50 concurrent"."""
     _banner()
-    cfg = _load_cfg(config, no_ai, authorized)
+    cfg = _load_cfg(config, no_ai, authorized, lab)
     orch = Orchestrator(cfg)
     code = _execute(orch, raw="", input_type="auto", plan=None, goal="",
                     ai_plan=False, save=save, formats=formats,
@@ -369,6 +387,9 @@ def scan(
     save: bool = typer.Option(True, "--save/--no-save"),
     formats: str = typer.Option("json,html,md", "--formats"),
     authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab",
+                             help="Authorised-lab mode: no auth prompt, no "
+                                  "caps, full capability."),
     no_ai: bool = typer.Option(False, "--no-ai"),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
@@ -382,7 +403,7 @@ def scan(
     _banner()
     con.print(Panel(EDU_NOTICE, title="⚠ Responsible-use & education notice",
                     border_style="yellow"))
-    cfg = _load_cfg(config, no_ai, authorized)
+    cfg = _load_cfg(config, no_ai, authorized, lab)
     orch = Orchestrator(cfg)
     from .models import TestPlan
     plan = TestPlan(concurrency=concurrency, total_requests=requests,

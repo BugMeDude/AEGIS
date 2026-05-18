@@ -1,6 +1,6 @@
 """Drive the real AEGIS GUI under Xvfb and capture screenshots + a demo GIF.
 
-Run:  xvfb-run -a -s "-screen 0 1360x920x24" python3 scripts/capture_gui.py
+Run:  xvfb-run -a -s "-screen 0 1600x940x24" python3 scripts/capture_gui.py
 """
 from __future__ import annotations
 

@@ -8,7 +8,7 @@
 
 [![version](https://img.shields.io/badge/version-2.0.0-8b5cf6?style=for-the-badge)](https://github.com/BugMeDude/AEGIS)
 [![python](https://img.shields.io/badge/python-3.10%2B-22d3ee?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![tests](https://img.shields.io/badge/tests-45%20passing-34d399?style=for-the-badge)](tests/)
+[![tests](https://img.shields.io/badge/tests-49%20passing-34d399?style=for-the-badge)](tests/)
 [![AI](https://img.shields.io/badge/AI-Ollama%20gemma4%3A31b-e879f9?style=for-the-badge)](docs/AI.md)
 [![license](https://img.shields.io/badge/license-MIT-f59e0b?style=for-the-badge)](LICENSE)
 
@@ -81,7 +81,7 @@ Self-contained **HTML dashboard**, JSON, Markdown, CSV — with charts, grade an
 
 <div align="center">
 
-### 🖥️ Desktop GUI — glassmorphic, animated, multi-colour
+### 🖥️ Desktop GUI — calm frosted glass, responsive, full-screen
 
 <img src="assets/gui-results.png" alt="AEGIS GUI — results, animated grade donut, live sparkline, AI insight" width="85%"/>
 
@@ -229,7 +229,7 @@ flowchart LR
 | `aegis init` | Write an example `aegis.yaml` |
 | `aegis gui` | Launch the desktop app |
 
-Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `--ramp` · `-O/--offensive` · `--ai-plan` · `--authorized` · `--no-ai` · `--formats`.
+Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `--ramp` · `-O/--offensive` · `--ai-plan` · `--authorized` · `--lab` · `--no-ai` · `--formats` · `-t/--type` · `-c/--config`.
 
 <details>
 <summary><b>Exit codes (CI-friendly)</b></summary>
@@ -246,27 +246,171 @@ Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `
 
 ---
 
-## 🔒 Responsible use &amp; configuration
+## 📚 Detailed examples (cookbook)
 
-AEGIS **refuses to generate load or probes against any non-local host** unless you affirm authorization (`--authorized`, `safety.authorized: true`, or `AEGIS_AUTHORIZED=1`). Concurrency, duration and request **caps** are always enforced. Host **allow/block lists** are supported.
+> Use `python3 -m aegis …` everywhere, or just `aegis …` after
+> `pip install -e .`. Input may be a literal string, a **file**, or `-` (stdin).
+> Bare hosts/IPs work too — `http://` is assumed (`127.0.0.1:8000`,
+> `api.example.com/v1`).
+
+<details open>
+<summary><b>Health, planning &amp; config</b></summary>
+
+```bash
+aegis doctor                                   # env, Ollama model, policy/mode
+aegis init                                     # write a commented aegis.yaml
+aegis plan "https://api.example.com" --goal "soak test"   # AI plan, NO traffic
+aegis plan collection.json -t postman --no-ai             # heuristic plan only
+aegis version
+```
+</details>
+
+<details open>
+<summary><b>Load / stress (you control the plan)</b></summary>
+
+```bash
+# Count model: 5000 requests at 50 concurrency
+aegis run "https://api.lab.local/health" -n 50 -r 5000 --lab
+
+# Duration model: hold 30 concurrency for 60s with a 5s ramp-up
+aegis run api.json -t postman -n 30 -d 60 --ramp 5 --lab
+
+# Throttled to ~200 req/s, custom timeout, save HTML+JSON
+aegis run "10.0.0.20:8080/api" -n 40 -r 4000 --rps 200 --timeout 20 \
+          --formats html,json
+
+# Let the AI design the plan from a goal instead of the numbers
+aegis run openapi.yaml -t openapi --ai-plan --goal "find the breaking point" --lab
+
+# From stdin / a cURL file
+cat req.curl | aegis run - -t curl --lab
+aegis run requests.curl -O --lab           # + offensive scan
+```
+</details>
+
+<details open>
+<summary><b>Autopilot — fully automated (AI plans → runs → analyses)</b></summary>
+
+```bash
+aegis autopilot "https://api.lab.local/v1" --goal "baseline" --lab
+aegis autopilot postman.json -t postman --goal "spike test" -O --lab
+aegis autopilot "10.0.0.5:9000" --goal "soak test" --formats html,md,json --lab
+```
+</details>
+
+<details open>
+<summary><b>Offensive + defensive scan (education / authorised research)</b></summary>
+
+```bash
+# Dedicated active DAST + passive analysis + AI severity/remediation
+aegis scan "https://app.lab.local/item?id=1" --lab
+aegis scan "http://127.0.0.1:8000/search?q=test" -r 20 -n 5
+aegis scan openapi.yaml -t openapi --lab --formats html
+
+# Bolt an active scan onto any run/autopilot with -O / --offensive
+aegis run  api.har -t har -O --lab
+aegis autopilot "https://api.lab.local" -O --goal "stress test" --lab
+```
+</details>
+
+<details open>
+<summary><b>Natural language</b></summary>
+
+```bash
+aegis ai "stress https://api.lab.local for 30 seconds with 50 concurrent" --lab
+aegis ai "hit 10.0.0.5:8080/api 500 times, 20 in parallel" --lab
+aegis ai "soak https://svc.lab.local for 2 minutes" --lab
+```
+</details>
+
+<details>
+<summary><b>Reports, CI &amp; automation</b></summary>
+
+```bash
+# Re-render a saved JSON report to HTML/Markdown/CSV
+aegis report aegis_reports/aegis_report_*.json --formats html,md
+
+# CI gate: non-zero (4) exit on a High/Critical finding
+aegis scan openapi.yaml -t openapi --lab --no-save || code=$?
+[ "${code:-0}" -eq 4 ] && { echo "Security regression"; exit 1; }
+
+# Schedule a nightly authorised scan
+echo '0 2 * * * cd /opt/AEGIS && python3 -m aegis scan https://api.lab.local --lab' | crontab -
+```
+</details>
+
+---
+
+## 🧪 Authorised public test targets
+
+These sites are **intentionally vulnerable and explicitly published for
+security testing &amp; education** — legal to test. Great for learning AEGIS:
+
+| Target | What it is |
+|---|---|
+| `http://testphp.vulnweb.com/listproducts.php?cat=1` | Acunetix PHP test app (SQLi/XSS) |
+| `http://rest.vulnweb.com` | Acunetix **vulnerable REST API** |
+| `http://testhtml5.vulnweb.com` · `http://testasp.vulnweb.com` | Acunetix test apps |
+| `http://demo.testfire.net` | IBM *AltoroMutual* demo bank |
+| `https://juice-shop.herokuapp.com` | OWASP **Juice Shop** |
+| `https://public-firing-range.appspot.com` | Google **Firing Range** (XSS) |
+| `https://httpbin.org/get` | HTTP echo — ideal for pure load tests |
+
+```bash
+aegis scan "http://testphp.vulnweb.com/listproducts.php?cat=1" -r 15 --lab
+aegis autopilot "http://rest.vulnweb.com" --goal "baseline" --lab
+```
+
+> Only ever test these specific authorised sandboxes or systems **you own /
+> are contracted to assess**. Keep the load modest — they are shared
+> community resources.
+
+---
+
+## 🔒 Responsible use, lab mode &amp; configuration
+
+**Default (safe).** A fresh clone **refuses to generate load or probes
+against any non-local host** unless you affirm authorization (`--authorized`,
+`safety.authorized: true`, or `AEGIS_AUTHORIZED=1`). Concurrency / duration /
+request **caps** apply, and **allow/block lists** are honoured. Loopback and
+**private RFC1918** ranges (`10.x`, `172.16–31.x`, `192.168.x`, `localhost`,
+`*.local`) are always treated as your lab — zero friction.
+
+**Lab mode (full capability).** In an isolated, fully-authorised lab, enable
+**lab mode** to waive the authorization prompt **and all caps** — full
+offensive capability, no restrictions:
+
+```bash
+aegis scan https://app.lab.local --lab          # per-run flag
+export AEGIS_LAB_MODE=1                          # whole shell/session
+```
+…or persist it in `aegis.yaml` (this file is **git-ignored**, so your machine
+runs unrestricted by default while the public repo default stays safe):
 
 ```bash
 python3 -m aegis init      # writes a commented aegis.yaml
 ```
 
 ```yaml
-ollama:   { model: "gemma4:31b-cloud", fallback_model: "gemma4:latest", enabled: true }
-safety:   { authorized: false, max_concurrency: 250, max_duration_seconds: 600,
-            allowlist: [], blocklist: [] }
+ollama: { model: "gemma4:31b-cloud", fallback_model: "gemma4:latest", enabled: true }
+safety:
+  lab_mode: true            # no auth prompt, NO caps, full capability
+  authorized: true
+  allowlist: []
+  blocklist: []
 report_dir: "aegis_reports"
 ```
+
+The GUI exposes the same: **Lab mode** toggle, **Authorised** toggle,
+**Fullscreen · F11** (Esc to exit), right-click **Cut/Copy/Paste/Clear** in
+the input, and **Open file…** for any cURL/URL-list/Postman/OpenAPI/HAR file.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-python3 -m pytest -q          # 45 tests · ~10s · offline & deterministic
+python3 -m pytest -q          # 49 tests · ~10s · offline & deterministic
 ```
 
 Spins up real local HTTP servers (one deliberately vulnerable) and exercises the async engine, parsers, safety gate, reporting, the heuristic AI path **and** the offensive scanner's detectors end-to-end.

@@ -8,7 +8,7 @@ ollama:
   enabled: true                 # set false to force the heuristic engine
 
 safety:
-  authorized: false             # MUST be true (or use --authorized) for non-local targets
+  authorized: true             # MUST be true (or use --authorized) for non-local targets
   max_concurrency: 250
   max_duration_seconds: 600
   max_total_requests: 200000

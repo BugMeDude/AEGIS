@@ -33,6 +33,10 @@ class SafetyPolicy:
     """
 
     authorized: bool = False
+    # Lab mode: isolated, fully-authorised environment. Waives the
+    # authorization prompt AND all load caps -> full capability, zero
+    # friction. Default False so a fresh public clone stays safe.
+    lab_mode: bool = False
     max_concurrency: int = 250
     max_duration_seconds: int = 600
     max_total_requests: int = 200_000
@@ -108,6 +112,9 @@ class AegisConfig:
             self.ollama.enabled = False
         if env.get("AEGIS_AUTHORIZED") in ("1", "true", "yes"):
             self.safety.authorized = True
+        if env.get("AEGIS_LAB_MODE") in ("1", "true", "yes"):
+            self.safety.lab_mode = True
+            self.safety.authorized = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -132,8 +139,11 @@ ollama:
   enabled: true                 # set false to force the heuristic engine
 
 safety:
-  authorized: false             # MUST be true (or use --authorized) for non-local targets
-  max_concurrency: 250
+  authorized: false             # true (or --authorized) for non-local targets
+  lab_mode: false               # true (or --lab / AEGIS_LAB_MODE=1) in an
+                                # isolated authorised lab: waives the auth
+                                # prompt AND all caps -> full capability
+  max_concurrency: 250          # (ignored when lab_mode: true)
   max_duration_seconds: 600
   max_total_requests: 200000
   allowlist: []                 # e.g. ["api.staging.mycorp.com"]
