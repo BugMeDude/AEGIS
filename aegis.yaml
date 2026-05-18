@@ -1,0 +1,16 @@
+# LOCAL AEGIS config — authorised sandbox lab.
+# This file is git-ignored: it is NOT pushed, so the public repo default
+# stays safe while *your* machine runs at full capability automatically.
+ollama:
+  model: "gemma4:31b-cloud"
+  fallback_model: "gemma4:latest"
+  enabled: true
+
+safety:
+  lab_mode: true        # no auth prompt, no caps, full offensive capability
+  authorized: true
+  allowlist: []
+  blocklist: []
+
+report_dir: "aegis_reports"
+default_timeout: 15.0
