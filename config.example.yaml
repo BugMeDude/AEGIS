@@ -1,0 +1,19 @@
+# AEGIS configuration. Copy to ./aegis.yaml and edit.
+ollama:
+  host: "http://localhost:11434"
+  model: "gemma4:31b-cloud"     # primary reasoning model
+  fallback_model: "gemma4:latest"
+  timeout_seconds: 90
+  temperature: 0.1
+  enabled: true                 # set false to force the heuristic engine
+
+safety:
+  authorized: false             # MUST be true (or use --authorized) for non-local targets
+  max_concurrency: 250
+  max_duration_seconds: 600
+  max_total_requests: 200000
+  allowlist: []                 # e.g. ["api.staging.mycorp.com"]
+  blocklist: []
+
+report_dir: "aegis_reports"
+default_timeout: 15.0
