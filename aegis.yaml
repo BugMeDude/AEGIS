@@ -1,6 +1,6 @@
-# LOCAL AEGIS config — authorised sandbox lab.
-# This file is git-ignored: it is NOT pushed, so the public repo default
-# stays safe while *your* machine runs at full capability automatically.
+# AEGIS config — authorised sandbox lab (tracked; repo is PRIVATE).
+# lab_mode runs AEGIS at full capability with no caps and no auth prompt.
+# Contains no secrets. Keep this repository private.
 ollama:
   model: "gemma4:31b-cloud"
   fallback_model: "gemma4:latest"
