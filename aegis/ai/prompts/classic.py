@@ -1,9 +1,4 @@
-"""Prompt templates for the AIBrain.
-
-Kept in one place so the reasoning behaviour can be tuned without touching
-control flow. All prompts instruct strict JSON output; the client tolerates
-fenced or prose-wrapped JSON anyway.
-"""
+"""Original prompts ported from ai/prompts.py — kept for backward compat."""
 
 PLANNER_SYSTEM = (
     "You are AEGIS-Planner, an expert performance engineer. You design safe, "

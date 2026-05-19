@@ -1,9 +1,10 @@
-"""Core domain models for AEGIS.
+"""Core domain models for AEGIS v3.
 
 Everything that flows between the parsers, the engine, the AI brain and the
 reporters is one of these dataclasses. They are deliberately plain and
 JSON-serialisable via :func:`to_dict` so reports and the AI layer share one
-shape.
+shape. v3 adds red-team / adversary-simulation models: attack chains, MITRE
+ATT&CK mapping, session state, pivot targets, and budget controls.
 """
 
 from __future__ import annotations
@@ -273,3 +274,299 @@ class RunReport:
 
 def now_iso() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+# ====================================================================
+# v3 Enhanced Models — Red Team / Advanced Adversary
+# ====================================================================
+
+class AuthLevel(str, Enum):
+    """Progressive authorization tiers for the safety gate."""
+    EDUCATION = "education"
+    RESEARCH = "research"
+    EXPERT = "expert"
+
+    @property
+    def rank(self) -> int:
+        return {"education": 0, "research": 1, "expert": 2}[self.value]
+
+
+MITRE_ATTACK_MAP: dict[str, str] = {
+    "SQL Injection (error-based)": "T1190",
+    "SQL Injection (time-based blind)": "T1190",
+    "Reflected XSS": "T1059.007",
+    "Path Traversal / LFI": "T1005",
+    "OS Command Injection": "T1059.003",
+    "Server-Side Template Injection": "T1059.007",
+    "Open Redirect": "T1204.001",
+    "Access-Control Bypass via Headers": "T1190",
+    "SSRF": "T1190",
+    "XXE": "T1059.007",
+    "Insecure Deserialization": "T1059.007",
+    "HTTP Request Smuggling": "T1190",
+    "Race Condition": "T1498",
+    "GraphQL Injection": "T1190",
+    "NoSQL Injection": "T1190",
+    "JWT Attack": "T1528",
+    "WebSocket Hijacking": "T1190",
+    "Mass Assignment": "T1190",
+    "Missing HSTS": "T1071.001",
+    "Missing Content-Security-Policy": "T1071.001",
+    "Stack Trace Disclosure": "T1040",
+    "SQL Error Leakage": "T1040",
+    "Potential Sensitive Data Exposure": "T1040",
+    "No Rate-Limiting Signalled": "T1498",
+    "Permissive CORS": "T1071.001",
+    "Server Version Disclosure": "T1040",
+    "Technology Disclosure": "T1040",
+    "Cleartext Transport": "T1040",
+    "Missing X-Content-Type-Options": "T1071.001",
+    "Missing X-Frame-Options": "T1071.001",
+}
+
+
+@dataclass(slots=True)
+class VulnerabilityV3:
+    """Enhanced vulnerability with MITRE ATT&CK mapping."""
+    type: str
+    description: str
+    severity: Severity
+    endpoint: str = ""
+    remediation: str = ""
+    evidence: str = ""
+    source: str = "heuristic"
+    mitre_id: str = ""
+    cve: str = ""
+    cwe: int = 0
+    confidence: float = 1.0
+    chain_step: int = 0
+    tags: list[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.mitre_id:
+            self.mitre_id = MITRE_ATTACK_MAP.get(self.type, "")
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["severity"] = self.severity.value
+        return d
+
+
+@dataclass(slots=True)
+class AttackBudget:
+    """Budget controls for a campaign — limits what the AI can do."""
+    max_injection_points: int = 50
+    max_data_extracted_kb: int = 100
+    max_concurrent_targets: int = 5
+    max_attack_seconds: int = 3600
+    max_chains: int = 3
+    allow_exfiltration: bool = False
+    allow_pivot: bool = False
+    allow_persistence: bool = False
+    usage: dict[str, int] = field(default_factory=lambda: {
+        "injection_points": 0, "data_kb": 0, "chains": 0, "targets": 0
+    })
+
+    def remaining(self, key: str) -> int:
+        limits = {
+            "injection_points": self.max_injection_points,
+            "data_kb": self.max_data_extracted_kb,
+            "chains": self.max_chains,
+            "targets": self.max_concurrent_targets,
+        }
+        used = self.usage.get(key, 0)
+        return max(0, limits.get(key, 0) - used)
+
+    def consume(self, key: str, amount: int = 1) -> bool:
+        if self.remaining(key) >= amount:
+            self.usage[key] = self.usage.get(key, 0) + amount
+            return True
+        return False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class ProxyConfig:
+    """Proxy chain configuration for layered anonymity."""
+    http: str = ""
+    https: str = ""
+    socks5: str = ""
+    socks5h: str = ""
+    tor: bool = False
+    chain: list[str] = field(default_factory=list)
+    rotate_per_request: bool = False
+
+    def effective_proxy(self) -> str | None:
+        if self.tor:
+            return "socks5h://127.0.0.1:9050"
+        if self.socks5h:
+            return f"socks5h://{self.socks5h}"
+        if self.socks5:
+            return f"socks5://{self.socks5}"
+        if self.https:
+            return self.https
+        if self.http:
+            return self.http
+        if self.chain:
+            return self.chain[0]
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class TLSFingerprint:
+    """Controls for TLS stack fingerprint randomization."""
+    ja3: str = ""
+    ja3s: str = ""
+    randomize: bool = False
+    impersonate: str = ""  # "chrome", "firefox", "safari", "ios", "android"
+
+
+@dataclass(slots=True)
+class AuthProfile:
+    """Persistent authentication profile for a campaign."""
+    type: str = "bearer"  # bearer | basic | digest | oauth2 | ntlm | apikey | custom
+    token: str = ""
+    username: str = ""
+    password: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    token_url: str = ""
+    scope: str = ""
+    refresh_token: str = ""
+    headers: dict[str, str] = field(default_factory=dict)
+    cookies: dict[str, str] = field(default_factory=dict)
+    auto_refresh: bool = False
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.token or self.username or self.client_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        if d["token"]:
+            d["token"] = d["token"][:8] + "..." if len(d["token"]) > 11 else d["token"]
+        if d["password"]:
+            d["password"] = "***"
+        if d["client_secret"]:
+            d["client_secret"] = "***"
+        return d
+
+
+@dataclass(slots=True)
+class PivotTarget:
+    """A lateral-movement target discovered during a campaign."""
+    host: str
+    port: int = 0
+    service: str = ""  # http | ssh | rdp | mysql | etc.
+    via_host: str = ""
+    via_port: int = 0
+    via_method: str = "ssh"  # ssh | socks | http_proxy
+    credentials: str = ""
+    discovered_by: str = ""
+    accessible: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class CampaignPhase(str, Enum):
+    """Phases of an autonomous attack campaign."""
+    INIT = "init"
+    RECON = "recon"
+    FINGERPRINT = "fingerprint"
+    ENUMERATE = "enumerate"
+    EXPLOIT = "exploit"
+    ESCALATE = "escalate"
+    PIVOT = "pivot"
+    EXFIL = "exfil"
+    REPORT = "report"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    ABORTED = "aborted"
+
+
+@dataclass(slots=True)
+class Campaign:
+    """A full autonomous attack campaign with state tracking."""
+    id: str
+    name: str = ""
+    target: str = ""
+    goal: str = ""
+    phase: CampaignPhase = CampaignPhase.INIT
+    auth: AuthProfile = field(default_factory=AuthProfile)
+    budget: AttackBudget = field(default_factory=AttackBudget)
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
+    tls: TLSFingerprint = field(default_factory=TLSFingerprint)
+    pivot_targets: list[PivotTarget] = field(default_factory=list)
+    findings: list[VulnerabilityV3] = field(default_factory=list)
+    sessions: list[str] = field(default_factory=list)
+    started_at: str = ""
+    finished_at: str = ""
+    operator: str = ""
+    auth_level: AuthLevel = AuthLevel.EDUCATION
+    tags: dict[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "target": self.target,
+            "goal": self.goal,
+            "phase": self.phase.value,
+            "auth_level": self.auth_level.value,
+            "pivot_targets": [p.to_dict() for p in self.pivot_targets],
+            "findings": [f.to_dict() for f in self.findings],
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "operator": self.operator,
+        }
+
+
+@dataclass(slots=True)
+class SessionState:
+    """Serializable session state for save/restore."""
+    campaign: Campaign | None = None
+    cookies: dict[str, dict[str, str]] = field(default_factory=dict)
+    headers: dict[str, dict[str, str]] = field(default_factory=dict)
+    tokens: dict[str, str] = field(default_factory=dict)
+    discovered_endpoints: list[str] = field(default_factory=list)
+    discovered_params: list[str] = field(default_factory=list)
+    active_connections: int = 0
+    total_requests: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+# Update RunReport to include v3 fields
+# We add optional v3 fields via a wrapper
+@dataclass(slots=True)
+class RunReportV3:
+    """Extended v3 run report with campaign data."""
+    report: RunReport = field(default_factory=lambda: RunReport(started_at=now_iso()))
+    campaign: Campaign | None = None
+    attack_chain: list[dict] = field(default_factory=list)
+    mitre_mapping: dict[str, list[VulnerabilityV3]] = field(default_factory=dict)
+    executive_narrative: str = ""
+    session_path: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        base = self.report.to_dict()
+        base["version"] = "3.0.0"
+        if self.campaign:
+            base["campaign"] = self.campaign.to_dict()
+        if self.attack_chain:
+            base["attack_chain"] = self.attack_chain
+        if self.mitre_mapping:
+            base["mitre_mapping"] = {
+                k: [v.to_dict() for v in vs]
+                for k, vs in self.mitre_mapping.items()
+            }
+        if self.executive_narrative:
+            base["executive_narrative"] = self.executive_narrative
+        return base

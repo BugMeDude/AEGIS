@@ -4,18 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-api"
-version = "2.1.0"
-description = "AEGIS - Autonomous API Stress & Security Intelligence Platform"
+version = "3.0.0"
+description = "AEGIS v3 — Autonomous API Attack, Stress & Security Intelligence Platform"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "BugMeDude" }]
-keywords = ["api", "load-testing", "stress-testing", "security", "ai", "ollama", "appsec"]
+keywords = ["api", "load-testing", "stress-testing", "security", "ai", "ollama", "appsec", "redteam", "pentest"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Topic :: Software Development :: Testing :: Traffic Generation",
+    "Intended Audience :: Information Technology",
     "Topic :: Security",
+    "Topic :: Software Development :: Testing :: Traffic Generation",
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
@@ -24,11 +25,21 @@ dependencies = [
     "typer>=0.12",
     "PyYAML>=6.0",
     "Jinja2>=3.1",
+    "prompt-toolkit>=3.0",
+    "openai>=1.0",
+    "anthropic>=0.30",
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2",
+    "stem>=1.8",
+    "h2>=4.1",
+    "cryptography>=41.0",
 ]
 
 [project.optional-dependencies]
 gui = ["matplotlib>=3.7", "numpy>=1.24", "Pillow>=10.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+ai = ["openai>=1.0", "anthropic>=0.30", "chromadb>=0.4.0", "sentence-transformers>=2.2"]
+network = ["stem>=1.8", "h2>=4.1"]
 
 [project.scripts]
 aegis = "aegis.cli:main"

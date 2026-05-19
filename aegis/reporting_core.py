@@ -212,4 +212,7 @@ def write_reports(
         p = f"{base}.html"
         Path(p).write_text(render_html(report), encoding="utf-8")
         written["html"] = p
+    if "sarif" in formats:
+        from .reporting.exporters.sarif import write_sarif
+        written["sarif"] = write_sarif(report, f"{base}.sarif")
     return written

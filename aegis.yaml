@@ -1,16 +1,34 @@
-# AEGIS config — authorised sandbox lab (tracked; repo is PRIVATE).
+# AEGIS v3 config — authorised sandbox lab (tracked; repo is PRIVATE).
 # lab_mode runs AEGIS at full capability with no caps and no auth prompt.
-# Contains no secrets. Keep this repository private.
-ollama:
-  model: "gemma4:31b-cloud"
-  fallback_model: "gemma4:latest"
-  enabled: true
+ai:
+  primary: "ollama"
+  rag_enabled: false
+  agentic_enabled: false
+  ollama:
+    model: "gemma4:31b-cloud"
+    fallback_model: "gemma4:latest"
+    enabled: true
+  openai:
+    enabled: false
+  anthropic:
+    enabled: false
 
 safety:
-  lab_mode: true        # no auth prompt, no caps, full offensive capability
+  lab_mode: true
   authorized: true
+  auth_level: "expert"
+  operator: ""
+  organization: ""
   allowlist: []
   blocklist: []
+
+proxy:
+  tor: false
+  chain: []
+
+tls:
+  randomize: false
+  impersonate: ""
 
 report_dir: "aegis_reports"
 default_timeout: 15.0

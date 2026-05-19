@@ -1,10 +1,15 @@
-"""AIBrain - the reasoning core.
+"""AIBrain v3 — the enhanced reasoning core.
 
-Every capability has two implementations: an LLM path (Ollama) and a
-deterministic heuristic path ported and hardened from the original
-``features/ai_*`` modules. The heuristic path is *always* run; the LLM path
-*augments* it when the daemon is reachable. This is why AEGIS produces useful
-output 100% of the time, online or offline.
+Every capability has three implementations:
+  1. LLM path (multi-provider via ModelRouter)
+  2. Deterministic heuristic path (always available)
+  3. Agentic path (AI strategist + payload engine)
+
+The heuristic path is *always* run; the LLM path *augments* it when a
+provider is reachable. The agentic path is opt-in (agentic_enabled).
+
+v3 adds: multi-provider support, RAG knowledge base integration,
+         AI-driven payload generation, autonomous campaign planning.
 """
 
 from __future__ import annotations
@@ -13,7 +18,7 @@ import json
 import re
 from urllib.parse import parse_qs, urlparse
 
-from ..config import OllamaConfig, SafetyPolicy
+from ..config import AIProviderConfig, OllamaConfig, SafetyPolicy
 from ..models import (
     AIInsight,
     EndpointStats,
@@ -22,9 +27,13 @@ from ..models import (
     Severity,
     TestPlan,
     Vulnerability,
+    VulnerabilityV3,
+    MITRE_ATTACK_MAP,
 )
 from . import prompts
-from .ollama import OllamaClient
+from .payload_engine import PayloadEngine
+from .router import ModelRouter
+from .strategist import AttackStrategist
 
 SENSITIVE = ("password", "passwd", "secret", "api_key", "apikey", "private_key",
              "access_token", "client_secret", "aws_secret", "ssn", "credit_card")
@@ -35,25 +44,46 @@ STACK_TRACES = (r"traceback \(most recent call last\)", r"at [\w.]+\(.*\.java:\d
 
 
 class AIBrain:
-    def __init__(self, ollama_cfg: OllamaConfig) -> None:
-        self.client = OllamaClient(ollama_cfg)
+    """Enhanced AI reasoning core with multi-provider and agentic support."""
+
+    def __init__(self, ollama_cfg: OllamaConfig | None = None,
+                 ai_cfg: AIProviderConfig | None = None) -> None:
+        if ai_cfg is not None:
+            self.ai_cfg = ai_cfg
+        elif ollama_cfg is not None:
+            from ..config import AIProviderConfig, OllamaConfig
+            self.ai_cfg = AIProviderConfig(ollama=ollama_cfg)
+        else:
+            from ..config import AIProviderConfig
+            self.ai_cfg = AIProviderConfig()
+
+        self.router = ModelRouter(self.ai_cfg)
+        self.strategist = AttackStrategist(self.ai_cfg)
+        self.payload_engine = PayloadEngine(self.router)
+
+        # Backward compat: expose OllamaClient-like interface
+        self.client = _LegacyClientWrapper(self.router)
 
     @property
     def engine_tag(self) -> str:
-        return f"ollama:{self.client.active_model}" if self.client.available else "heuristic"
+        best = self.router.best_provider()
+        if best:
+            return f"{best.name}:{best.active_model if hasattr(best, 'active_model') else 'active'}"
+        return "heuristic"
 
     # ================================================================== #
     # 1. PLANNING
     # ================================================================== #
     def plan(self, specs: list[RequestSpec], goal: str, policy: SafetyPolicy) -> TestPlan:
         targets = "\n".join(f"- {s.method} {s.url}" for s in specs[:25])
-        data = self.client.chat_json(
+        data = self.router.chat_json(
             prompts.PLANNER_SYSTEM,
             prompts.PLANNER_USER.format(
                 targets=targets, goal=goal or "general performance & reliability check",
                 authorized=policy.authorized,
                 max_c=policy.max_concurrency, max_d=policy.max_duration_seconds,
             ),
+            task="plan",
         )
         if isinstance(data, dict) and ("concurrency" in data or "duration_seconds" in data):
             try:
@@ -90,8 +120,8 @@ class AIBrain:
     # 2. NATURAL LANGUAGE -> REQUEST + PLAN
     # ================================================================== #
     def nlp(self, query: str) -> tuple[RequestSpec | None, TestPlan]:
-        data = self.client.chat_json(
-            prompts.NLP_SYSTEM, prompts.NLP_USER.format(query=query)
+        data = self.router.chat_json(
+            prompts.NLP_SYSTEM, prompts.NLP_USER.format(query=query), task="nlp"
         )
         if isinstance(data, dict) and data.get("url"):
             spec = RequestSpec(
@@ -208,9 +238,10 @@ class AIBrain:
         return out
 
     def _ai_security(self, ep: EndpointStats) -> list[Vulnerability]:
-        if not self.client.available or not (ep.sample_body or ep.sample_headers):
+        provider = self.router.best_provider("security")
+        if provider is None or not (ep.sample_body or ep.sample_headers):
             return []
-        data = self.client.chat_json(
+        data = provider.chat_json(
             prompts.SECURITY_SYSTEM,
             prompts.SECURITY_USER.format(
                 method=ep.method, url=ep.url, status=ep.sample_status,
@@ -258,9 +289,10 @@ class AIBrain:
             "endpoints": [e.to_dict() for e in report.endpoints][:10],
             "top_vulns": [v.to_dict() for v in report.vulnerabilities[:5]],
         }
-        data = self.client.chat_json(
+        data = self.router.chat_json(
             prompts.SUMMARY_SYSTEM,
             prompts.SUMMARY_USER.format(report=json.dumps(compact)[:6000]),
+            task="insight",
         )
         if isinstance(data, dict) and data.get("summary"):
             ins = AIInsight(
@@ -336,3 +368,31 @@ class AIBrain:
         if score >= 45:
             return "D"
         return "F"
+
+
+class _LegacyClientWrapper:
+    """Wraps ModelRouter to provide backward-compatible OllamaClient-like interface."""
+
+    def __init__(self, router: ModelRouter) -> None:
+        self.router = router
+
+    @property
+    def available(self) -> bool:
+        return len(self.router.available_providers()) > 0
+
+    @property
+    def active_model(self) -> str:
+        best = self.router.best_provider()
+        if best and hasattr(best, 'active_model'):
+            return best.active_model
+        return "heuristic"
+
+    def health(self) -> dict:
+        providers = self.router.available_providers()
+        best = self.router.best_provider()
+        return {
+            "ok": len(providers) > 0,
+            "providers": providers,
+            "model": self.active_model,
+            "reason": "" if providers else "No AI provider available",
+        }

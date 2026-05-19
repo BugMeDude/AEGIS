@@ -7,4 +7,5 @@ dist/
 aegis_reports/
 .venv/
 *.log
+.claude/settings.local.json
 # aegis.yaml is intentionally tracked (private repo, lab-mode config, no secrets)
