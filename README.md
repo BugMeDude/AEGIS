@@ -77,19 +77,31 @@ Self-contained **HTML dashboard**, JSON, Markdown, CSV — with charts, grade an
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshots — live lab snapshot
+
+> Captured from a **real working lab run**: v3.0.0, `lab_mode`, the live
+> `gemma4:31b-cloud` engine, offensive scan + HTTP/2 enabled, against an
+> authorised localhost target. Reproduce any time with
+> `xvfb-run -a -s "-screen 0 1600x940x24" python3 scripts/capture_lab.py`
+> and `python3 scripts/capture_cli.py`.
 
 <div align="center">
 
-### 🖥️ Desktop GUI — calm frosted glass, responsive (v3 controls: HTTP/2, Recon, Protocols, SARIF)
+### 🖥️ Desktop GUI — calm frosted glass, responsive (v3: HTTP/2 · Recon · Protocols · SARIF)
 
-<img src="assets/gui-results.png" alt="AEGIS GUI — results, animated grade donut, live sparkline, AI insight" width="85%"/>
+<img src="assets/gui-idle.png" alt="AEGIS GUI — lab mode idle, gemma4:31b-cloud, Autopilot live-selected" width="85%"/>
 
-<em>Animated grade gauge · live throughput sparkline · colour-coded AI insight · neon gradient controls</em>
+<em>LAB MODE ribbon · live <code>gemma4:31b-cloud</code> engine · <b>Autopilot</b> live-selected (inputs dim/enable per mode) · HTTP/2 toggle · Recon/Protocols buttons</em>
 
 <br/><br/>
 
-<img src="assets/gui-demo.gif" alt="AEGIS GUI live run" width="80%"/>
+<img src="assets/gui-results.png" alt="AEGIS GUI — results, grade B, real gemma AI insight" width="85%"/>
+
+<em>Animated grade gauge · live sparkline · real <code>ollama:gemma4:31b-cloud</code> AI insight · ↓ SARIF export</em>
+
+<br/><br/>
+
+<img src="assets/gui-demo.gif" alt="AEGIS GUI live lab run" width="80%"/>
 
 <em>Live run — motion, gradient progress shimmer, real-time metrics</em>
 
@@ -102,15 +114,21 @@ Self-contained **HTML dashboard**, JSON, Markdown, CSV — with charts, grade an
 
 ### ⌨️ Command line
 
+<img src="assets/cli-doctor.png" alt="aegis doctor — lab mode, gemma4:31b-cloud, expert tier" width="64%"/>
+
+<em><code>aegis doctor</code> — LAB mode · live <code>gemma4:31b-cloud</code> · EXPERT tier · caps disabled</em>
+
+<br/>
+
 <img src="assets/cli-scan.png" alt="aegis scan — offensive + defensive" width="78%"/>
 
 <em><code>aegis scan</code> — active DAST + AI insight, colour-graded, CI exit codes</em>
 
 <br/>
 
-<img src="assets/cli-doctor.png" alt="aegis doctor" width="62%"/>
+<img src="assets/cli-protocols.png" alt="aegis protocols — HTTP/2, WebSocket, gRPC" width="72%"/>
 
-<em><code>aegis doctor</code> — environment, live Ollama model &amp; safety policy</em>
+<em><code>aegis protocols</code> — Phase 4.2 HTTP/2 · WebSocket · gRPC probe (observe-only, clean diagnostics)</em>
 
 </div>
 

@@ -81,6 +81,18 @@ def main():
     rec.print(f"[dim]exit code: {code}[/]")
     save(rec, "cli-scan.svg", "aegis scan  —  offensive + defensive")
 
+    # --- protocols (Phase 4.2: HTTP/2 / WebSocket / gRPC, observe only) ---
+    rec = Console(record=True, width=100)
+    cli.con = rec
+    cli._banner()
+    rec.print('[cyan]$ aegis protocols http://127.0.0.1:8867 --lab[/]')
+    try:
+        cli.protocols(target="http://127.0.0.1:8867", timeout=6.0,
+                       authorized=False, lab=True, no_ai=True, config=None)
+    except SystemExit:
+        pass
+    save(rec, "cli-protocols.svg", "aegis protocols  —  HTTP/2 · WS · gRPC")
+
 
 if __name__ == "__main__":
     main()
