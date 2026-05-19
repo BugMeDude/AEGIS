@@ -608,6 +608,7 @@ class AegisGUI:
     # ---- responsive layout -------------------------------------------- #
     def _first_layout(self):
         self._relayout()
+        self._apply_mode_state()   # reflect the initial mode live
 
     def _on_resize(self, e):
         if e.widget is not self.root:
@@ -777,14 +778,45 @@ class AegisGUI:
             sel = self.mode.get() == val
             _round(b, 1, 1, 131, 31, 9,
                     fill=C["acc"] if sel else C["panel2"],
-                    outline=C["acc"] if sel else C["line"], width=1)
-            b.create_text(66, 16, text=names[val],
+                    outline=C["acc"] if sel else C["line"],
+                    width=2 if sel else 1)
+            label = ("● " + names[val]) if sel else names[val]
+            b.create_text(66, 16, text=label,
                           fill="#0b1020" if sel else C["mut"],
-                          font=("DejaVu Sans", 10, "bold"))
+                          font=("DejaVu Sans", 10,
+                                "bold" if sel else "normal"))
+
+    _MODE_DESC = {
+        "manual": "Manual — you set concurrency / duration / requests",
+        "autopilot": "Autopilot — AI designs the plan from the GOAL",
+        "nlp": "Natural — describe the test in plain English (input box)",
+    }
+
+    def _apply_mode_state(self):
+        """Live-reflect the selected mode: enable the inputs it uses,
+        dim the ones it doesn't, and show a live status line."""
+        m = self.mode.get()
+        manual, auto = m == "manual", m == "autopilot"
+        for _k, (lb, sp) in self._spins.items():
+            try:
+                sp.configure(state="normal" if manual else "disabled")
+            except tk.TclError:
+                pass
+            lb.configure(fg=C["ink"] if manual else C["faint"])
+        try:
+            self.goal.configure(state="normal" if auto else "disabled",
+                                disabledbackground=C["inset"])
+        except tk.TclError:
+            self.goal.configure(state="normal" if auto else "disabled")
+        self.L["s_goal"].configure(fg=C["acc"] if auto else C["faint"])
+        if not (self.worker and self.worker.is_alive()):
+            self.status.configure(
+                text=f"● LIVE · Mode: {self._MODE_DESC[m]}")
 
     def _set_mode(self, v):
         self.mode.set(v)
         self._render_modes()
+        self._apply_mode_state()
 
     # ---- editor / clipboard ------------------------------------------- #
     def _menu(self, w):

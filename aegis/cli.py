@@ -444,6 +444,9 @@ def gui(config: str = typer.Option(None, "--config", "-c")) -> None:
 @app.command()
 def recon(
     target: str = typer.Argument(..., help="Target URL to reconnoitre."),
+    authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab"),
+    no_ai: bool = typer.Option(False, "--no-ai"),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Full reconnaissance: fingerprint, discover, extract schema.
@@ -452,7 +455,7 @@ def recon(
     OpenAPI/GraphQL schema extraction, and hidden parameter fuzzing.
     """
     _banner()
-    cfg = AegisConfig.load(config)
+    cfg = _load_cfg(config, no_ai, authorized, lab)
     orch = Orchestrator(cfg)
 
     con.print(f"[cyan]🔍 Reconnaissance against:[/] {target}\n")
@@ -494,11 +497,14 @@ def recon(
 def protocols(
     target: str = typer.Argument(..., help="Target URL or host:port."),
     timeout: float = typer.Option(8.0, "--timeout"),
+    authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab"),
+    no_ai: bool = typer.Option(False, "--no-ai"),
     config: str = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Test HTTP/2, WebSocket and gRPC support (Phase 4.2, observation only)."""
     _banner()
-    orch = Orchestrator(AegisConfig.load(config))
+    orch = Orchestrator(_load_cfg(config, no_ai, authorized, lab))
     con.print(f"[cyan]🔌 Protocol probe:[/] {target}\n")
     r = orch.test_protocols(target, timeout=timeout)
     h = r["http2"]
