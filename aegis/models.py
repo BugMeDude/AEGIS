@@ -60,6 +60,7 @@ class TestPlan:
     target_rps: float = 0.0            # 0 => unthrottled
     ramp_up_seconds: int = 0
     timeout_seconds: float = 15.0
+    http2: bool = False                # negotiate HTTP/2 (ALPN h2) if offered
     rationale: str = "Default plan."
     source: str = "default"            # default | user | ai | nlp
 

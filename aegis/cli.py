@@ -300,6 +300,8 @@ def run(
     rps: float = typer.Option(0.0, "--rps"),
     ramp: int = typer.Option(0, "--ramp"),
     timeout: float = typer.Option(15.0, "--timeout"),
+    http2: bool = typer.Option(False, "--http2",
+                               help="Negotiate HTTP/2 (ALPN h2) if offered."),
     ai_plan: bool = typer.Option(False, "--ai-plan"),
     offensive: bool = typer.Option(False, "--offensive", "-O"),
     ai_payloads: bool = typer.Option(False, "--ai-payloads",
@@ -320,7 +322,7 @@ def run(
     user_plan = None if ai_plan else TestPlan(
         concurrency=concurrency, duration_seconds=duration,
         total_requests=requests, target_rps=rps, ramp_up_seconds=ramp,
-        timeout_seconds=timeout, source="user",
+        timeout_seconds=timeout, http2=http2, source="user",
         rationale="Operator-specified plan.")
     code = _execute(orch, raw=_read_input(input), input_type=input_type,
                     plan=user_plan, goal=goal, ai_plan=ai_plan,
@@ -486,6 +488,95 @@ def recon(
     params = results.get("params", [])
     if params:
         con.print(f"\n[green]Hidden params ({len(params)}):[/] {', '.join(params[:10])}")
+
+
+@app.command()
+def protocols(
+    target: str = typer.Argument(..., help="Target URL or host:port."),
+    timeout: float = typer.Option(8.0, "--timeout"),
+    config: str = typer.Option(None, "--config", "-c"),
+) -> None:
+    """Test HTTP/2, WebSocket and gRPC support (Phase 4.2, observation only)."""
+    _banner()
+    orch = Orchestrator(AegisConfig.load(config))
+    con.print(f"[cyan]🔌 Protocol probe:[/] {target}\n")
+    r = orch.test_protocols(target, timeout=timeout)
+    h = r["http2"]
+    con.print(f"[bold]HTTP/2[/]  supported=[{'green' if h['http2_supported'] else 'yellow'}]"
+              f"{h['http2_supported']}[/]  negotiated={h.get('negotiated') or '-'}  "
+              f"status={h.get('status')}  {h.get('error') or ''}")
+    w = r["websocket"]
+    con.print(f"[bold]WebSocket[/]  connected=[{'green' if w['connected'] else 'yellow'}]"
+              f"{w['connected']}[/]  probes={len(w.get('observations', []))}  "
+              f"{w.get('error') or ''}")
+    for o in w.get("observations", []):
+        con.print(f"   · {o['probe']:<14} {o['ms']:>7.1f}ms  reply={o['reply']}")
+    g = r["grpc"]
+    con.print(f"[bold]gRPC[/]  grpcio={g.get('grpcio')}  method={g.get('method')}  "
+              f"{('services=' + str(g.get('services'))) if g.get('services') else ''}"
+              f"{('looks_like_grpc=' + str(g.get('looks_like_grpc'))) if 'looks_like_grpc' in g else ''}"
+              f"  {g.get('error') or ''}")
+
+
+@app.command()
+def validate(
+    input: str = typer.Argument(..., help="A saved aegis_report_*.json"),
+    authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab"),
+    config: str = typer.Option(None, "--config", "-c"),
+) -> None:
+    """Bounded proof-of-impact for SQLi/XSS findings in a saved report.
+
+    Phase 6.1. EXPERT auth tier + budget required. Confirms exploitability
+    with a few probes; never enumerates or dumps data.
+    """
+    _banner()
+    cfg = _load_cfg(config, True, authorized, lab)
+    orch = Orchestrator(cfg)
+    rep = _report_from_dict(json.loads(Path(input).read_text(encoding="utf-8")))
+    con.print("[cyan]🧪 Proof-of-impact validation (bounded, no extraction)[/]\n")
+    rows = orch.validate_findings(rep)
+    if not rows:
+        con.print("[yellow]No SQLi/XSS findings to validate.[/]")
+        raise typer.Exit(0)
+    t = Table(header_style="bold cyan")
+    for c in ("Type", "Endpoint", "Confirmed", "Method", "Probes", "Notes"):
+        t.add_column(c, overflow="fold")
+    for r in rows:
+        t.add_row(r["finding_type"], r["endpoint"],
+                  "[green]YES[/]" if r["confirmed"] else "no",
+                  r["method"] or "-", str(r["probes_used"]), r["notes"])
+    con.print(t)
+
+
+@app.command()
+def assess(
+    targets: list[str] = typer.Argument(..., help="Explicit authorised "
+                                        "targets (URLs/host:port)."),
+    authorized: bool = typer.Option(False, "--authorized"),
+    lab: bool = typer.Option(False, "--lab"),
+    config: str = typer.Option(None, "--config", "-c"),
+) -> None:
+    """Scoped assessment of additional EXPLICITLY-supplied authorised targets.
+
+    Phase 6.2 (safe form). Each target is independently re-authorised. No
+    auto-pivot, no tunnelling, no lateral movement.
+    """
+    _banner()
+    cfg = _load_cfg(config, True, authorized, lab)
+    orch = Orchestrator(cfg)
+    con.print(f"[cyan]🛰  Scoped assessment of {len(targets)} target(s)[/]\n")
+    t = Table(header_style="bold cyan")
+    for c in ("Target", "Authorised", "Status", "Server", "Note"):
+        t.add_column(c, overflow="fold")
+    for r in orch.assess_scope(list(targets)):
+        fp = r.get("fingerprint", {})
+        t.add_row(r["target"],
+                  "[green]yes[/]" if r["authorised"] else "[red]no[/]",
+                  str(r.get("status", "-")),
+                  str(fp.get("server", "-")) if fp else "-",
+                  r.get("error") or "ok")
+    con.print(t)
 
 
 @app.command()

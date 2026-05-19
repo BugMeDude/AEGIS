@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.0.0 — v3 red-team platform: Phase 4.2 protocols + Phase 6 validation
+
+- **Phase 4.2 — protocols** (`aegis/transport/protocols/`): HTTP/2 capability
+  probe, bounded WebSocket robustness tester, gRPC reflection/HTTP-2 hint.
+  New `aegis protocols <target>` command; `--http2` flag + `TestPlan.http2`
+  drive the load engine over HTTP/2 (httpx ALPN). GUI: **HTTP/2** toggle +
+  **Protocols** / **Recon** buttons.
+- **Phase 6.1 — proof-of-impact validation** (`aegis/pivot/validator.py`):
+  confirms an already-found SQLi/XSS is real with ≤4 bounded probes
+  (boolean differential / single version banner / reflected marker).
+  EXPERT auth tier + budget gated. **No enumeration/dumping** — enforced in
+  code. New `aegis validate <report.json>`.
+- **Phase 6.2 — scoped assessment** (`aegis/pivot/scope.py`): assesses only
+  explicitly-supplied targets, each independently re-authorised. No
+  auto-pivot / tunnelling / lateral movement / persistence. New
+  `aegis assess <targets…>`.
+- **SARIF 2.1.0** exporter wired into `write_reports` and the GUI
+  (**↓ SARIF** button); `--formats … ,sarif`.
+- Audit fixes carried in: config single-source-of-truth (offline
+  determinism), strategist relative-import crash, RAG offline keyword
+  fallback + wiring, dead `offense.py`/empty dirs removed.
+- 66 tests green (added `test_v3_fixes.py`, `test_v3_protocols_pivot.py`);
+  GUI verified under Xvfb. Version → 3.0.0.
+
 ## 2.1.0 — Lab mode, responsive frosted GUI
 
 - **Lab mode** (`--lab` · `AEGIS_LAB_MODE=1` · `safety.lab_mode: true`):

@@ -505,14 +505,21 @@ class AegisGUI:
         self.authorized = tk.BooleanVar(value=self.cfg.safety.authorized)
         self.lab = tk.BooleanVar(value=self.cfg.safety.lab_mode)
         self.offensive = tk.BooleanVar(value=False)
+        self.http2 = tk.BooleanVar(value=False)
         self.tg_auth = Toggle(R, "I am authorised to test the target(s)",
                               self.authorized, C["ok"])
         self.tg_lab = Toggle(R, "Lab mode — no caps, full capability",
                              self.lab, C["danger"])
         self.tg_off = Toggle(R, "Offensive active scan  (education / research)",
                              self.offensive, C["acc"])
+        self.tg_h2 = Toggle(R, "HTTP/2 (ALPN h2 if offered)",
+                            self.http2, C["acc"])
         self.L["h_dast"] = self._hint(
             "Active DAST · SQLi · XSS · traversal · cmd/SSTI · redirect · bypass")
+        self.recon_btn = Btn(R, "Recon", self._do_recon, w=92, h=30,
+                             kind="ghost")
+        self.proto_btn = Btn(R, "Protocols", self._do_protocols, w=104, h=30,
+                             kind="ghost")
         self.start_btn = Btn(R, "▶  START", self._start, w=250, h=44,
                              kind="primary")
         self.stop_btn = Btn(R, "■  STOP", self._stop, w=140, h=44,
@@ -574,9 +581,10 @@ class AegisGUI:
         self.footer = tk.Frame(R, bg=C["panel"])
         self.save_btns = []
         for fmt, txt in (("html", "↓ HTML"), ("json", "↓ JSON"),
-                         ("md", "↓ MD"), ("csv", "↓ CSV")):
+                         ("md", "↓ MD"), ("csv", "↓ CSV"),
+                         ("sarif", "↓ SARIF")):
             self.save_btns.append(
-                Btn(R, txt, lambda f=fmt: self._save(f), w=116, h=38,
+                Btn(R, txt, lambda f=fmt: self._save(f), w=104, h=38,
                     kind="ghost"))
         self.foot_note = tk.Label(R, bg=C["panel"], fg=C["faint"],
                                   font=("DejaVu Sans", 8), anchor="e",
@@ -671,26 +679,30 @@ class AegisGUI:
         self.L["s_mode"].place(x=x, y=y)
         for i, val in enumerate(("manual", "autopilot", "nlp")):
             self._mode_btns[val].place(x=x + i * 138, y=y + 18)
-        y += 60
+        y += 52
         for key in ("concurrency", "duration", "requests", "timeout"):
             lb, sp = self._spins[key]
             lb.place(x=x, y=y + 2, width=260, height=20)
             sp.place(x=x + 300, y=y, width=100, height=26)
-            y += 34
-        y += 6
+            y += 30
+        y += 4
         self.L["s_goal"].place(x=x, y=y)
-        self.goal.place(x=x, y=y + 18, width=400, height=26)
-        y += 56
+        self.goal.place(x=x, y=y + 17, width=400, height=25)
+        y += 48
         self.tg_auth.place(x=x, y=y)
-        self.tg_lab.place(x=x, y=y + 30)
-        self.tg_off.place(x=x, y=y + 60)
-        self.L["h_dast"].place(x=x, y=y + 90)
-        y += 116
+        self.tg_lab.place(x=x, y=y + 26)
+        self.tg_off.place(x=x, y=y + 52)
+        self.tg_h2.place(x=x, y=y + 78)
+        self.L["h_dast"].place(x=x, y=y + 102)
+        y += 120
+        self.recon_btn.place(x=x, y=y)
+        self.proto_btn.place(x=x + 100, y=y)
+        y += 38
         self.start_btn.place(x=x, y=y)
         self.stop_btn.place(x=x + 262, y=y)
-        y += 56
+        y += 52
         self.prog.place(x=x, y=y, width=400, height=10)
-        self.status.place(x=x, y=y + 18, width=400, height=18)
+        self.status.place(x=x, y=y + 16, width=400, height=18)
 
     def _layout_right(self, x0, x1, y0, H, PAD):
         w = x1 - x0
@@ -905,6 +917,7 @@ class AegisGUI:
                         duration_seconds=self.v_duration.get(),
                         total_requests=self.v_requests.get(),
                         timeout_seconds=float(self.v_timeout.get() or 15),
+                        http2=self.http2.get(),
                         source="user", rationale="GUI manual plan.")
                     rep = self.orch.run(specs, plan=plan, offensive=offensive,
                                         on_event=cb, should_stop=stop)
@@ -920,6 +933,39 @@ class AegisGUI:
     def _stop(self):
         self.stop_flag.set()
         self.status.configure(text="Stopping…")
+
+    # ---- v3: recon / protocols (worker-threaded, non-blocking) --------- #
+    def _bg(self, label, fn):
+        if self.worker and self.worker.is_alive():
+            return
+        tgt = self.input.get("1.0", "end").strip().splitlines()
+        tgt = tgt[0].strip() if tgt else ""
+        if not tgt:
+            messagebox.showwarning("AEGIS", "Provide a target first.")
+            return
+        self.cfg.safety.authorized = self.authorized.get()
+        self.cfg.safety.lab_mode = self.lab.get()
+        self.orch = Orchestrator(self.cfg)
+        self.status.configure(text=f"{label} …")
+
+        def job():
+            try:
+                self.events.put(("v3result",
+                                  {"title": label, "data": fn(self.orch, tgt)}))
+            except Exception as e:  # noqa: BLE001
+                self.events.put(("error", {"t": type(e).__name__,
+                                           "m": str(e)}))
+        self.worker = threading.Thread(target=job, daemon=True)
+        self.worker.start()
+
+    def _do_recon(self):
+        import asyncio
+        self._bg("Recon", lambda o, t: asyncio.run(o.run_recon(
+            t if "://" in t else f"http://{t}")))
+
+    def _do_protocols(self):
+        self._bg("Protocol probe",
+                 lambda o, t: o.test_protocols(t, timeout=8.0))
 
     # ---- pump ---------------------------------------------------------- #
     def _pump(self):
@@ -949,6 +995,14 @@ class AegisGUI:
                      f"avg {d.get('avg_ms',0):.0f} ms")
         elif ev == "report":
             self._finish(d["report"])
+        elif ev == "v3result":
+            import json as _json
+            self._show_tab(0)
+            self.summary.delete("1.0", "end")
+            self.summary.insert("end", f"{d['title']}\n", "h")
+            self.summary.insert("end", _json.dumps(d["data"], indent=2,
+                                                   default=str)[:8000])
+            self.status.configure(text=f"{d['title']} complete.")
         elif ev == "error":
             self.start_btn.config_state(True)
             self.stop_btn.config_state(False)

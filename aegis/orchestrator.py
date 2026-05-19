@@ -127,6 +127,65 @@ class Orchestrator:
         return result
 
     # ================================================================== #
+    # PROTOCOLS  (Phase 4.2)
+    # ================================================================== #
+    def test_protocols(self, target: str, *, timeout: float = 8.0) -> dict:
+        """Probe HTTP/2, WebSocket and gRPC support for a target.
+
+        Pure observation. WebSocket URL is derived (ws/wss) only to test the
+        same authorised host the operator supplied.
+        """
+        from .transport.protocols import (probe_grpc, http2_report,
+                                           websocket_report)
+        url = target if "://" in target else f"http://{target}"
+        ws_url = url.replace("https://", "wss://").replace("http://", "ws://")
+        return {
+            "target": url,
+            "http2": http2_report(url, timeout=timeout),
+            "websocket": websocket_report(ws_url, timeout=timeout),
+            "grpc": probe_grpc(target, timeout=timeout),
+        }
+
+    # ================================================================== #
+    # POST-EXPLOIT VALIDATION  (Phase 6.1 — bounded, EXPERT-gated)
+    # ================================================================== #
+    def validate_findings(self, report) -> list[dict]:
+        """Confirm impact of already-detected SQLi/XSS findings (bounded).
+
+        Refuses unless the EXPERT auth tier + exfil/validation budget flag
+        are set. Never enumerates or dumps data.
+        """
+        from .pivot import ImpactValidator
+        iv = ImpactValidator(
+            auth_level=self.config.safety.auth_level,
+            allow_exfil=self.config.safety.budget_allow_exfil,
+            timeout=self.config.default_timeout,
+        )
+        out: list[dict] = []
+        seen: set[tuple[str, str]] = set()
+        for v in getattr(report, "vulnerabilities", []):
+            t = v.type.lower()
+            if not any(k in t for k in ("sql", "xss")):
+                continue
+            key = (v.type, v.endpoint)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(iv.validate_sync(v.type, v.endpoint).to_dict())
+        return out
+
+    # ================================================================== #
+    # SCOPED ASSESSMENT  (Phase 6.2 — explicit targets only)
+    # ================================================================== #
+    def assess_scope(self, targets: list[str]) -> list[dict]:
+        """Assess additional, explicitly-supplied authorised targets.
+
+        No auto-pivot from a compromise, no tunnelling, no lateral movement.
+        """
+        from .pivot import ScopedAssessment
+        return ScopedAssessment(self.config).assess(targets)
+
+    # ================================================================== #
     # PARSING
     # ================================================================== #
     def parse(

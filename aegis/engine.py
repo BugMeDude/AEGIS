@@ -153,7 +153,8 @@ class LoadEngine:
         gap = (concurrency / plan.target_rps) if plan.target_rps > 0 else 0.0
 
         async with httpx.AsyncClient(
-            limits=limits, timeout=timeout, follow_redirects=True, verify=False
+            limits=limits, timeout=timeout, follow_redirects=True,
+            verify=False, http2=getattr(plan, "http2", False),
         ) as client:
             delays = await self._ramp(concurrency)
 

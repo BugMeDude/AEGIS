@@ -11,6 +11,10 @@ chromadb>=0.4.0
 sentence-transformers>=2.2
 stem>=1.8
 h2>=4.1
+websockets>=12.0
+# Optional: gRPC reflection enumeration (soft-degrades to HTTP/2 hint if absent)
+# grpcio>=1.60
+# grpcio-reflection>=1.60
 cryptography>=41.0
 
 # Optional GUI / charting extras (recommended)

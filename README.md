@@ -6,9 +6,9 @@
 
 **AI-driven API load-testing &amp; security platform · Offensive + Defensive · Education &amp; Research**
 
-[![version](https://img.shields.io/badge/version-2.0.0-8b5cf6?style=for-the-badge)](https://github.com/BugMeDude/AEGIS)
+[![version](https://img.shields.io/badge/version-3.0.0-8b5cf6?style=for-the-badge)](https://github.com/BugMeDude/AEGIS)
 [![python](https://img.shields.io/badge/python-3.10%2B-22d3ee?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![tests](https://img.shields.io/badge/tests-49%20passing-34d399?style=for-the-badge)](tests/)
+[![tests](https://img.shields.io/badge/tests-66%20passing-34d399?style=for-the-badge)](tests/)
 [![AI](https://img.shields.io/badge/AI-Ollama%20gemma4%3A31b-e879f9?style=for-the-badge)](docs/AI.md)
 [![license](https://img.shields.io/badge/license-MIT-f59e0b?style=for-the-badge)](LICENSE)
 
@@ -81,7 +81,7 @@ Self-contained **HTML dashboard**, JSON, Markdown, CSV — with charts, grade an
 
 <div align="center">
 
-### 🖥️ Desktop GUI — calm frosted glass, responsive, full-screen
+### 🖥️ Desktop GUI — calm frosted glass, responsive (v3 controls: HTTP/2, Recon, Protocols, SARIF)
 
 <img src="assets/gui-results.png" alt="AEGIS GUI — results, animated grade donut, live sparkline, AI insight" width="85%"/>
 
@@ -225,11 +225,17 @@ flowchart LR
 | `aegis autopilot <input>` | Fully automated — AI plans, runs, analyses |
 | `aegis scan <input>` | **Offensive + defensive** active DAST scan |
 | `aegis ai "<sentence>"` | Natural-language driven test |
-| `aegis report <file.json>` | Re-render a saved report to HTML/MD/CSV |
+| `aegis recon <target>` | Fingerprint · endpoint/param discovery · schema |
+| `aegis protocols <target>` | **v3** HTTP/2 · WebSocket · gRPC probe (observe only) |
+| `aegis validate <report.json>` | **v3** bounded proof-of-impact (EXPERT tier) |
+| `aegis assess <targets…>` | **v3** scoped multi-target assessment (explicit only) |
+| `aegis campaign <target>` | **v3** autonomous agentic campaign |
+| `aegis repl` | **v3** interactive console |
+| `aegis report <file.json>` | Re-render a saved report (HTML/MD/CSV/SARIF) |
 | `aegis init` | Write an example `aegis.yaml` |
 | `aegis gui` | Launch the desktop app |
 
-Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `--ramp` · `-O/--offensive` · `--ai-plan` · `--authorized` · `--lab` · `--no-ai` · `--formats` · `-t/--type` · `-c/--config`.
+Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `--ramp` · `--http2` · `-O/--offensive` · `--ai-plan` · `--ai-payloads` · `--authorized` · `--lab` · `--no-ai` · `--formats` (json,html,md,csv,**sarif**) · `-t/--type` · `-c/--config`.
 
 <details>
 <summary><b>Exit codes (CI-friendly)</b></summary>
@@ -243,6 +249,60 @@ Key flags: `-n` concurrency · `-d` duration(s) · `-r` requests · `--rps` · `
 | 4 | Completed, but a **High/Critical** finding exists |
 
 </details>
+
+---
+
+## 🧬 v3 advanced capabilities (Phase 4.2 & 6)
+
+### Protocols — HTTP/2 · WebSocket · gRPC  *(observe only)*
+
+```bash
+# Detect HTTP/2 (ALPN h2), WebSocket behaviour, gRPC reflection/hint
+python3 -m aegis protocols https://api.lab.local
+python3 -m aegis protocols 10.0.0.5:8080 --timeout 6
+
+# Drive the load engine over HTTP/2
+python3 -m aegis run https://api.lab.local -n 50 -r 2000 --http2 --lab
+python3 -m aegis autopilot https://api.lab.local --http2 --lab
+```
+
+`protocols` is pure observation (negotiated version, a few bounded WebSocket
+edge-frames, gRPC reflection when `grpcio` is present, else an HTTP/2 hint).
+The **HTTP/2** toggle and **Protocols**/**Recon** buttons are in the GUI too.
+
+### Proof-of-impact validation  *(Phase 6.1 — bounded, EXPERT-gated)*
+
+```bash
+# Confirms an already-found SQLi/XSS is real — a few probes, NO data dump.
+# Requires EXPERT auth tier + budget; refuses otherwise.
+python3 -m aegis validate aegis_reports/aegis_report_*.json --lab
+```
+
+> Hard-capped at **4 probes per finding**. It confirms exploitability
+> (boolean differential / single version banner / reflected marker) and
+> **never** enumerates or dumps tables, columns or rows — by design and
+> enforced in code, per the project's risk-mitigation policy.
+
+### Scoped assessment  *(Phase 6.2 — explicit targets only)*
+
+```bash
+# Assess additional targets you EXPLICITLY list and are authorised for.
+python3 -m aegis assess https://api.lab.local 10.0.0.5:8080 https://b.lab.local --lab
+```
+
+> Each target is independently re-authorised through the safety gate. There
+> is **no** auto-pivot from a compromise, **no** SSH tunnelling, **no**
+> lateral movement and **no** persistence — intentionally.
+
+### Reports → SARIF 2.1.0
+
+```bash
+python3 -m aegis scan https://api.lab.local --formats json,html,sarif --lab
+python3 -m aegis report aegis_reports/aegis_report_*.json --formats sarif
+```
+
+SARIF imports into GitHub code-scanning, DefectDojo, Azure DevOps, etc. The
+GUI exposes a **↓ SARIF** export button.
 
 ---
 
@@ -410,7 +470,7 @@ the input, and **Open file…** for any cURL/URL-list/Postman/OpenAPI/HAR file.
 ## 🧪 Testing
 
 ```bash
-python3 -m pytest -q          # 49 tests · ~10s · offline & deterministic
+python3 -m pytest -q          # 66 tests · ~10s · offline & deterministic
 ```
 
 Spins up real local HTTP servers (one deliberately vulnerable) and exercises the async engine, parsers, safety gate, reporting, the heuristic AI path **and** the offensive scanner's detectors end-to-end.
