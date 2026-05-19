@@ -514,7 +514,9 @@ def protocols(
     w = r["websocket"]
     con.print(f"[bold]WebSocket[/]  connected=[{'green' if w['connected'] else 'yellow'}]"
               f"{w['connected']}[/]  probes={len(w.get('observations', []))}  "
-              f"{w.get('error') or ''}")
+              f"[dim]{w.get('error') or ''}[/]")
+    if w.get("note"):
+        con.print(f"   [dim]↳ {w['note']}[/]")
     for o in w.get("observations", []):
         con.print(f"   · {o['probe']:<14} {o['ms']:>7.1f}ms  reply={o['reply']}")
     g = r["grpc"]

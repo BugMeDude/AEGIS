@@ -37,6 +37,20 @@ def test_websocket_softfail_on_non_ws(http_server):
     # Connecting WS to a plain HTTP server fails gracefully (no exception).
     assert ws["available"] is True
     assert ws["connected"] is False and ws["error"]
+    # Friendly, no raw traceback-style class dump.
+    assert "Traceback" not in ws["error"]
+
+
+def test_websocket_friendly_messages():
+    from aegis.transport.protocols.websocket import _diagnose, _friendly
+    redir = type("InvalidURI", (Exception,), {})(
+        "https://www.example.com/ isn't a valid URI: scheme isn't ws or wss")
+    assert _friendly(redir) == "no WebSocket endpoint here (server HTTP-redirected)"
+    assert "https://www.example.com/" in _diagnose(redir)
+    dns = type("gaierror", (Exception,), {})("[Errno -2] Name or service not known")
+    assert _friendly(dns) == "host did not resolve (DNS)"
+    ref = type("ConnectionRefusedError", (Exception,), {})("Connect call failed")
+    assert _friendly(ref) == "connection refused (no listener)"
 
 
 def test_grpc_probe_softfails(http_server):

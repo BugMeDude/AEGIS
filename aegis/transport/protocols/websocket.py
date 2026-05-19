@@ -63,8 +63,37 @@ async def probe_websocket(url: str, *, timeout: float = 8.0,
                 if rec["closed"]:
                     break
     except Exception as exc:  # noqa: BLE001
-        out["error"] = f"{type(exc).__name__}: {exc}"
+        out["error"] = _friendly(exc)
+        out["note"] = _diagnose(exc)
     return out
+
+
+def _friendly(exc: Exception) -> str:
+    name = type(exc).__name__
+    msg = str(exc)
+    if name == "InvalidURI" and ("http://" in msg or "https://" in msg):
+        return "no WebSocket endpoint here (server HTTP-redirected)"
+    if name in ("gaierror",) or "Name or service not known" in msg:
+        return "host did not resolve (DNS)"
+    if name in ("ConnectionRefusedError",) or "Connect call failed" in msg:
+        return "connection refused (no listener)"
+    if name in ("InvalidStatus", "InvalidStatusCode", "InvalidHandshake",
+                "InvalidMessage"):
+        return f"not a WebSocket endpoint ({name})"
+    if name in ("TimeoutError",):
+        return "WebSocket handshake timed out"
+    return f"{name}: {msg[:120]}"
+
+
+def _diagnose(exc: Exception) -> str:
+    msg = str(exc)
+    if "http://" in msg or "https://" in msg:
+        # Surface the redirect target so the operator can re-target it.
+        import re
+        m = re.search(r"https?://[^\s']+", msg)
+        if m:
+            return f"redirected to {m.group(0)} — try that URL or its ws(s):// form"
+    return ""
 
 
 def websocket_report(url: str, *, timeout: float = 8.0) -> dict[str, Any]:
